@@ -18,7 +18,7 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: 'price-desc', label: 'Price: High to Low' },
 ]
 
-/** Map UI sort option to DummyJSON sortBy & order (for server-side sort) */
+// Map UI sort option to DummyJSON sortBy & order (for server-side sort)ß
 function getSortParams(sort: SortOption): { sortBy: string; order: 'asc' | 'desc' } {
   switch (sort) {
     case 'newest':
@@ -113,8 +113,7 @@ export default function ProductsPage() {
     return () => { cancelled = true }
   }, [debouncedSearch, category, page, sort, isCategoryFilter])
 
-  useEffect(() => setPage(0), [category])
-  useEffect(() => setPage(0), [debouncedSearch])
+  useEffect(() => setPage(0), [debouncedSearch,category])
 
   useEffect(() => {
     fetchCategories()
@@ -129,16 +128,37 @@ export default function ProductsPage() {
   const effectiveTotal = isCategoryFilter ? sortedProducts.length : total
   const totalPages = Math.max(1, Math.ceil(effectiveTotal / PAGE_SIZE))
 
+  type PaginationItem =
+    | { type: 'page'; value: number }
+    | { type: 'ellipsis'; direction: 'left' | 'right' }
+  const paginationItems = useMemo((): PaginationItem[] => {
+    const currentPage = page + 1
+    const items: PaginationItem[] = []
+    if (totalPages <= 0) return items
+    items.push({ type: 'page', value: 1 })
+    if (totalPages <= 5) {
+      for (let i = 2; i <= totalPages; i++) items.push({ type: 'page', value: i })
+      return items
+    }
+    if (currentPage > 3) items.push({ type: 'ellipsis', direction: 'left' })
+    const low = Math.max(2, currentPage - 1)
+    const high = Math.min(totalPages - 1, currentPage + 1)
+    for (let i = low; i <= high; i++) items.push({ type: 'page', value: i })
+    if (currentPage < totalPages - 2) items.push({ type: 'ellipsis', direction: 'right' })
+    if (totalPages > 1) items.push({ type: 'page', value: totalPages })
+    return items
+  }, [page, totalPages])
+
   return (
     <div className="min-h-screen bg-gray-100">
       <main >
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 md:p-8">
-          <header className="mb-6">
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Product Catalog</h1>
-            <p className="text-sm md:text-base text-gray-500 mt-1">Discover our wide selection of quality products</p>
+          <header className="mb-8">
+            <div className="text-2xl md:text-[40px] font-[400] text-gray-900">Product Catalog</div>
+            <p className="text-sm md:text-base text-gray-500 mt-[10px]">Discover our wide selection of quality products</p>
           </header>
 
-          <div className="w-full space-y-4 mb-6">
+          <div className="w-full space-y-4 mb-10">
             <div className="w-full flex flex-col sm:flex-row gap-3 sm:gap-4">
               <div className="relative flex-1 min-w-0 w-full">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -155,7 +175,7 @@ export default function ProductsPage() {
                   className="w-full pl-10 pr-4 py-3 sm:py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-gray-400 focus:border-gray-400 outline-none transition-shadow hover:border-gray-400"
                 />
               </div>
-              <div className="flex items-center gap-3 flex-shrink-0 w-full sm:w-auto">
+              <div className="flex items-center gap-4 flex-shrink-0 w-full sm:w-auto">
                 <CustomDropdown
                   value={category}
                   onChange={setCategory}
@@ -178,7 +198,7 @@ export default function ProductsPage() {
             </div>
           </div>
 
-          <p className="text-sm text-gray-600 mb-6">
+          <p className="text-sm text-gray-600 mb-4">
             Showing {paginatedProducts.length} of {effectiveTotal} products
           </p>
 
@@ -208,7 +228,7 @@ export default function ProductsPage() {
 
               {totalPages > 1 && (
                 <nav
-                  className="flex flex-wrap justify-center items-center gap-3 sm:gap-4 mt-8 pt-6 border-t border-gray-200"
+                  className="flex flex-wrap justify-center items-center gap-3 sm:gap-4 mt-8 pt-6 border-gray-200"
                   aria-label="Pagination"
                 >
                   <button
@@ -224,24 +244,42 @@ export default function ProductsPage() {
                     </span>
                     Previous
                   </button>
-                  <div className="flex items-center gap-3 sm:gap-4">
-                    {Array.from({ length: totalPages }, (_, i) =>
-                      page === i ? (
-                        <span
-                          key={i}
-                          className="inline-flex items-center justify-center min-w-[2.25rem] h-9 px-3 rounded-md bg-white border border-gray-300 text-gray-900 text-sm font-medium"
-                          aria-current="page"
-                        >
-                          {i + 1}
-                        </span>
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    {paginationItems.map((item, i) =>
+                      item.type === 'page' ? (
+                        page === item.value - 1 ? (
+                          <span
+                            key={`${item.value}-${i}`}
+                            className="inline-flex items-center justify-center min-w-[2.25rem] h-9 px-3 rounded-md bg-white border border-gray-300 text-gray-900 text-sm font-medium"
+                            aria-current="page"
+                          >
+                            {item.value}
+                          </span>
+                        ) : (
+                          <button
+                            key={`${item.value}-${i}`}
+                            type="button"
+                            onClick={() => setPage(item.value - 1)}
+                            className="inline-flex items-center justify-center min-w-[2.25rem] h-9 px-3 rounded-md text-sm font-medium text-gray-900 hover:text-gray-600"
+                          >
+                            {item.value}
+                          </button>
+                        )
                       ) : (
                         <button
-                          key={i}
+                          key={`ellipsis-${item.direction}-${i}`}
                           type="button"
-                          onClick={() => setPage(i)}
-                          className="inline-flex items-center justify-center min-h-[2.25rem] py-2 px-1 text-sm font-medium text-gray-900 hover:text-gray-600"
+                          onClick={() =>
+                            setPage((p) =>
+                              item.direction === 'left'
+                                ? Math.max(0, p - 1)
+                                : Math.min(totalPages - 1, p + 1)
+                            )
+                          }
+                          className="inline-flex items-center justify-center min-w-[2.25rem] h-9 px-1 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900"
+                          aria-label={item.direction === 'left' ? 'Previous pages' : 'Next pages'}
                         >
-                          {i + 1}
+                          …
                         </button>
                       )
                     )}
